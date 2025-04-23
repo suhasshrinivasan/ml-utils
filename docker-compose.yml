@@ -1,0 +1,23 @@
+version: "3.9"
+
+services:
+  dev-gpu:
+    build: .
+    image: ml-utils
+    volumes:
+      - .:/src/project
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - capabilities: [gpu]
+    entrypoint: /bin/bash -c "sleep infinity"
+    container_name: ml-utils-dev-gpu
+  
+  dev-cpu:
+    build: .
+    image: ml-utils
+    volumes:
+      - .:/src/project
+    entrypoint: /bin/bash -c "sleep infinity"
+    container_name: ml-utils-dev-cpu
