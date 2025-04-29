@@ -4,8 +4,7 @@ import numpy as np
 import pytest
 import torch
 
-from ml_utils.trainer import (Trainer, TrainResult, TrainState,
-                              default_train_step_fn)
+from ml_utils.trainer import Trainer, TrainResult, TrainState, default_train_step_fn
 
 
 @pytest.fixture
