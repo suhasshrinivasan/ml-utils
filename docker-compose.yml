@@ -21,3 +21,11 @@ services:
       - .:/src/project
     entrypoint: /bin/bash -c "sleep infinity"
     container_name: ml-utils-dev-cpu
+
+  test-runner:
+    build: .
+    image: ml-utils
+    volumes:
+      - .:/src/project
+    entrypoint: /bin/bash -c "cd /src/project && pytest -v"
+    container_name: ml-utils-test-runner
