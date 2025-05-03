@@ -33,7 +33,6 @@ class TrainState:
 
 @dataclass
 class TrainResult:
-    model: torch.nn.Module
     train_losses: List
     state: TrainState
 
@@ -77,7 +76,7 @@ class Trainer:
         for cb in self.callbacks:
             cb.on_run_end(model, self.state)
 
-        return TrainResult(model=model, train_losses=train_losses, state=self.state)
+        return TrainResult(train_losses=train_losses, state=self.state)
 
     def _train_epoch(self, model, train_loader):
         model.train()
