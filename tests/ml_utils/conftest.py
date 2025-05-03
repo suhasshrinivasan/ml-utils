@@ -10,12 +10,21 @@ INPUT_DIM = 2
 OUTPUT_DIM = 1
 NUM_SAMPLES = 9
 TOTAL_STEPS = 10
+BEST_TOTAL_STEPS = 7
 LEARNING_RATE = 0.01
 
 # === Set random seed ===
 SEED = 42
 torch.manual_seed(SEED)
 
+# === Dummy classes ===
+class DummyModel(torch.nn.Module):
+    def __init__(self):
+        super().__init__()
+        self.linear = torch.nn.Linear(INPUT_DIM, OUTPUT_DIM)
+
+    def forward(self, x):
+        return self.linear(x)
 
 # === Fixtures ===
 @pytest.fixture
@@ -23,15 +32,6 @@ def dummy_model():
     """
     Fixture to create a dummy model for testing.
     """
-
-    class DummyModel(torch.nn.Module):
-        def __init__(self):
-            super().__init__()
-            self.linear = torch.nn.LazyLinear(OUTPUT_DIM)
-
-        def forward(self, x):
-            return self.linear(x)
-
     return DummyModel()
 
 
@@ -71,6 +71,28 @@ def dummy_run_end_state():
     state.batch_count = BATCH_SIZE
     state.total_steps = TOTAL_STEPS
     return state
+
+# @pytest.fixture
+# def dummy_run_end_state_with_early_stopping():
+#     state = TrainState()
+#     state.epoch = 100
+#     state.logs = {
+#         "loss": 0.045,
+#         "accuracy": 0.999,
+#         "val_loss": 0.067,
+#         "val_accuracy": 0.89,
+#         "early_stopping": {
+#                 "best_val_loss": 0.044,
+#                 "best_model_state": DummyModel.state_dict(),
+#                 "best_epoch": self.best_train_state.epoch,
+#                 "best_total_steps": self.best_train_state.total_steps,
+#             }
+#     }
+#     state.stop_training = True
+#     state.batch_count = BATCH_SIZE
+#     state.total_steps = TOTAL_STEPS
+#     return state
+
 
 
 @pytest.fixture
