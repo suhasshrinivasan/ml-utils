@@ -7,6 +7,8 @@ from ml_utils.backend import Backend
 from ml_utils.evaluation import EvalSpec, evaluate
 from ml_utils.trainer import TrainState
 
+from copy import deepcopy
+
 
 class Callback(ABC):
     """
@@ -122,3 +124,69 @@ class EvaluatorCallback(Callback):
 
     def on_run_end(self, model, state):
         self._evaluate(model, state)
+
+
+class EarlyStopperCallback(Callback):
+    """
+    Stop training if the monitored metric does not improve for a given number of epochs.
+    """
+
+    def __init__(self, patience: int = 5, threshold: float = 0.0, metric: str = "loss.mean/val", higher_is_better: bool = False):
+        """
+        Initialize the early stopping callback.
+
+        Args:
+            patience (int): Number of epochs with no improvement after which training will be stopped.
+            threshold (float): Minimum change to qualify as an improvement.
+        """
+        super().__init__()
+        self.patience = patience
+        self.threshold = threshold
+        self.metric = metric
+        self.best_train_state = None
+        self.best_model_state = None
+        self.higher_is_better = higher_is_better
+
+    def on_run_begin(self, model, state):
+        state.stop_training = False
+        self.best_train_state = deepcopy(state)
+        if self.best_train_state.logs.get(self.metric) is None: # model evaluation not performed
+            self.best_train_state.logs[self.metric] = self._worst_value
+        else:
+            self.best_model_state = model.state_dict()
+
+    def on_epoch_end(self, model, state):
+        current_value = state.logs[self.metric]
+        if self._metric_has_improved(current_value):
+            self.best_train_state = deepcopy(state)
+            self.best_train_state = model.state_dict()
+            state.stop_training = False
+        else:
+            self.patience -= 1
+            if self.patience == 0:
+                state.stop_training = True
+            
+    def on_run_end(self, _, state):
+        if self.best_train_state[self.metric] != self._worst_value:
+            state.logs["early_stopping"] = {
+                f"best_{self.metric}": self.best_train_state.logs[self.metric],
+                "best_model_state": self.best_model_state,
+                "best_epoch": self.best_train_state.epoch,
+                "best_total_steps": self.best_train_state.total_steps,
+            }
+
+    @property
+    def _worst_value(self):
+        val = float("-inf") if self.higher_is_better else float("inf")
+        return val
+    
+    def _metric_has_improved(self, current_value):
+        best_so_far = self.best_train_state.logs[self.metric]
+        delta = current_value - best_so_far
+        if self.higher_is_better:
+            if delta > self.threshold:
+                return True
+        else:
+            if delta < self.threshold:
+                return True
+        return False

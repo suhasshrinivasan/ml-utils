@@ -3,9 +3,17 @@ from unittest.mock import MagicMock
 import pytest
 import torch
 
-from ml_utils.callbacks import EvaluatorCallback, LoggerCallback
+from ml_utils.callbacks import EvaluatorCallback, LoggerCallback, EarlyStopperCallback
 from ml_utils.evaluation import EvalSpec, mean_agg
 from ml_utils.trainer import TrainState
+
+def dummy_metric_fn(model, batch, backend):
+    """
+    A tiny metric: returns a tensor full of ones so the mean is 1.0.
+    Keeps the interface (model, batch, backend) that evaluate() expects.
+    """
+    x, _ = batch
+    return torch.ones(x.shape[0], device=backend.device)
 
 
 class TestLoggerCallback:
@@ -39,16 +47,6 @@ class TestLoggerCallback:
             in c
             for c in calls
         )
-
-
-def dummy_metric_fn(model, batch, backend):
-    """
-    A tiny metric: returns a tensor full of ones so the mean is 1.0.
-    Keeps the interface (model, batch, backend) that evaluate() expects.
-    """
-    x, _ = batch
-    return torch.ones(x.shape[0], device=backend.device)
-
 
 class TestEvaluatorCallback:
 
@@ -146,3 +144,54 @@ class TestEvaluatorCallback:
 
         # No loaders => no metrics, but also no crash
         assert state.logs == {}
+
+class TestEarlyStopperCallback:
+    def test_worst_value_set_correctly(self):
+        dummy_early_stopper_higher_is_better = EarlyStopperCallback(
+            higher_is_better=True
+        )
+        assert dummy_early_stopper_higher_is_better._worst_value == float("-inf")
+
+        dummy_early_stopper_lower_is_better = EarlyStopperCallback(
+            higher_is_better=False
+        )
+        assert dummy_early_stopper_lower_is_better._worst_value == float("inf")
+
+    def test_on_run_begin_when_training_from_scratch(self, dummy_model, dummy_run_begin_state):
+        metric = "val_loss"
+        assert dummy_run_begin_state.logs.get(metric) is None
+        dummy_early_stopper = EarlyStopperCallback(
+            metric=metric
+        )
+        dummy_early_stopper.on_run_begin(dummy_model, dummy_run_begin_state)
+
+        # print(dummy_run_begin_state.__annotations__)
+        # assert dummy_early_stopper.best_train_state
+        assert dummy_early_stopper.best_train_state.logs[metric] == dummy_early_stopper._worst_value
+        assert dummy_early_stopper.best_model_state is None
+        assert dummy_early_stopper.best_train_state.stop_training == False
+        assert dummy_run_begin_state.stop_training == False
+
+
+    def test_on_run_begin_when_continue_training(self, dummy_model, dummy_epoch_end_state):
+        metric = "val_loss"
+        assert dummy_epoch_end_state.logs.get(metric) is not None
+        dummy_early_stopper = EarlyStopperCallback(metric=metric)
+        dummy_early_stopper.on_run_begin(dummy_model, dummy_epoch_end_state)
+        assert dummy_early_stopper.best_train_state == dummy_epoch_end_state
+        assert dummy_early_stopper.best_model_state is not None
+        print(dummy_model.state_dict())
+        assert (dummy_model.state_dict() == dummy_early_stopper.best_model_state)
+        assert dummy_epoch_end_state.stop_training == False
+
+
+    def test_run_on_begin_when_continue_training_with_stop_training_set(self, dummy_model, dummy_run_end_state):
+        assert dummy_run_end_state.stop_training == True
+        metric = "val_loss"
+        assert dummy_run_end_state.logs.get(metric) is not None
+        dummy_early_stopper = EarlyStopperCallback(metric=metric)
+        dummy_early_stopper.on_run_begin(dummy_model, dummy_run_end_state)
+        assert dummy_early_stopper.best_train_state == dummy_run_end_state
+        assert dummy_early_stopper.best_model_state is not None
+        assert dummy_model.state_dict() == dummy_early_stopper.best_model_state
+        assert dummy_run_end_state.stop_training == False
