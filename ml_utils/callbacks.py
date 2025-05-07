@@ -1,4 +1,5 @@
 from abc import ABC, abstractmethod
+from copy import deepcopy
 from typing import Any, Callable, Dict, Iterable, List, Optional, Tuple
 
 import torch
@@ -6,8 +7,6 @@ import torch
 from ml_utils.backend import Backend
 from ml_utils.evaluation import EvalSpec, evaluate
 from ml_utils.trainer import TrainState
-
-from copy import deepcopy
 
 
 class Callback(ABC):
@@ -131,7 +130,13 @@ class EarlyStopperCallback(Callback):
     Stop training if the monitored metric does not improve for a given number of epochs.
     """
 
-    def __init__(self, patience: int = 5, threshold: float = 0.0, metric: str = "loss.mean/val", higher_is_better: bool = False):
+    def __init__(
+        self,
+        patience: int = 5,
+        threshold: float = 0.0,
+        metric: str = "loss.mean/val",
+        higher_is_better: bool = False,
+    ):
         """
         Initialize the early stopping callback.
 
@@ -150,7 +155,9 @@ class EarlyStopperCallback(Callback):
     def on_run_begin(self, model, state):
         state.stop_training = False
         self.best_train_state = deepcopy(state)
-        if self.best_train_state.logs.get(self.metric) is None: # model evaluation not performed
+        if (
+            self.best_train_state.logs.get(self.metric) is None
+        ):  # model evaluation not performed
             self.best_train_state.logs[self.metric] = self._worst_value
         else:
             self.best_model_state = model.state_dict()
@@ -165,7 +172,7 @@ class EarlyStopperCallback(Callback):
             self.patience -= 1
             if self.patience == 0:
                 state.stop_training = True
-            
+
     def on_run_end(self, _, state):
         if self.best_train_state[self.metric] != self._worst_value:
             state.logs["early_stopping"] = {
@@ -179,7 +186,7 @@ class EarlyStopperCallback(Callback):
     def _worst_value(self):
         val = float("-inf") if self.higher_is_better else float("inf")
         return val
-    
+
     def _metric_has_improved(self, current_value):
         best_so_far = self.best_train_state.logs[self.metric]
         delta = current_value - best_so_far

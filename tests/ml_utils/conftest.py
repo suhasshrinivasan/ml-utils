@@ -17,6 +17,7 @@ LEARNING_RATE = 0.01
 SEED = 42
 torch.manual_seed(SEED)
 
+
 # === Dummy classes ===
 class DummyModel(torch.nn.Module):
     def __init__(self):
@@ -25,6 +26,7 @@ class DummyModel(torch.nn.Module):
 
     def forward(self, x):
         return self.linear(x)
+
 
 # === Fixtures ===
 @pytest.fixture
@@ -72,6 +74,7 @@ def dummy_run_end_state():
     state.total_steps = TOTAL_STEPS
     return state
 
+
 # @pytest.fixture
 # def dummy_run_end_state_with_early_stopping():
 #     state = TrainState()
@@ -92,7 +95,6 @@ def dummy_run_end_state():
 #     state.batch_count = BATCH_SIZE
 #     state.total_steps = TOTAL_STEPS
 #     return state
-
 
 
 @pytest.fixture
